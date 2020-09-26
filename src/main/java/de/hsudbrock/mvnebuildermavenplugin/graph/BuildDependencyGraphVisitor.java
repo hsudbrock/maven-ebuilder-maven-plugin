@@ -7,18 +7,14 @@ import java.util.Deque;
 
 import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.graph.DependencyVisitor;
-
-import com.google.common.graph.ElementOrder;
-import com.google.common.graph.MutableNetwork;
-import com.google.common.graph.MutableValueGraph;
-import com.google.common.graph.ValueGraphBuilder;
+import org.jgrapht.graph.DefaultDirectedGraph;
 
 public class BuildDependencyGraphVisitor implements DependencyVisitor {
 
 	private final Deque<DependencyGraphNode> nodeStack = new ArrayDeque<>();
-	private final MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph;
+	private final DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph;
 
-	public BuildDependencyGraphVisitor(MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
+	public BuildDependencyGraphVisitor(DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
 		this.graph = graph;
 	}
 
@@ -38,9 +34,9 @@ public class BuildDependencyGraphVisitor implements DependencyVisitor {
 
 		if (parentNode != null) {
 			if (permit(node)) {
-				graph.addNode(graphNode);
-				graph.addNode(parentNode);
-				graph.putEdgeValue(parentNode, graphNode,
+				graph.addVertex(graphNode);
+				graph.addVertex(parentNode);
+				graph.addEdge(parentNode, graphNode,
 						new DependencyGraphEdge(fromScope(node.getDependency().getScope())));
 			}
 		}
@@ -58,7 +54,7 @@ public class BuildDependencyGraphVisitor implements DependencyVisitor {
 		}
 	}
 
-	public MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> getGraph() {
+	public DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> getGraph() {
 		return graph;
 	}
 

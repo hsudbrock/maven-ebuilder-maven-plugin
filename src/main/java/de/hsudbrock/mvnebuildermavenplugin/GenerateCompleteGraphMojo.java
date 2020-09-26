@@ -1,6 +1,5 @@
 package de.hsudbrock.mvnebuildermavenplugin;
 
-import static de.hsudbrock.mvnebuildermavenplugin.graph.DependencyType.UNKNOWN_DEP;
 import static freemarker.template.Configuration.VERSION_2_3_30;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
@@ -18,8 +17,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import javax.management.RuntimeErrorException;
 
 import org.apache.maven.artifact.DefaultArtifact;
 import org.apache.maven.artifact.handler.DefaultArtifactHandler;
@@ -49,17 +46,12 @@ import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.DependencyResolutionResult;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuilder;
-import org.apache.maven.project.ProjectBuildingException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectDependenciesResolver;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystemSession;
-import org.jgrapht.alg.cycle.TarjanSimpleCycles;
-import org.jgrapht.graph.guava.MutableValueGraphAdapter;
-
-import com.google.common.graph.EndpointPair;
-import com.google.common.graph.MutableValueGraph;
-import com.google.common.graph.ValueGraphBuilder;
+import org.jgrapht.alg.cycle.SzwarcfiterLauerSimpleCycles;
+import org.jgrapht.graph.DefaultDirectedGraph;
 
 import de.hsudbrock.mvnebuildermavenplugin.graph.BuildDependencyGraphVisitor;
 import de.hsudbrock.mvnebuildermavenplugin.graph.DependencyGraphEdge;
@@ -110,15 +102,14 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 	@Override
 	public void execute() throws MojoExecutionException, MojoFailureException {
 		try {
-			MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph = ValueGraphBuilder.directed()
-					.allowsSelfLoops(true).build();
-			graph.addNode(new DependencyGraphNode(
+			DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph = new DefaultDirectedGraph<>(DependencyGraphEdge.class);
+			graph.addVertex(new DependencyGraphNode(
 					getProject(this.groupId, this.artifactId, this.version, "compile", this.type, this.classifier), "jar"));
 
 			boolean keepGoing = true;
 			while (keepGoing) {
 				// Get nodes that still need to be analyzed
-				Set<DependencyGraphNode> remainingNodes = graph.nodes().stream()
+				Set<DependencyGraphNode> remainingNodes = graph.vertexSet().stream()
 						.filter(node -> !node.isAsProject() && !node.isOptional() && !node.getType().equals("pom"))
 						.collect(toSet());
 
@@ -137,6 +128,9 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 				}
 			}
 			
+			getLog().info("Number of nodes: " + graph.vertexSet().size());
+			getLog().info("Number of edges: " + graph.edgeSet().size());
+			
 			removeCycles(graph);
 
 			writeGraph(graph);
@@ -146,10 +140,9 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 		}
 	}
 
-	private void removeCycles(MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
-		MutableValueGraphAdapter<DependencyGraphNode, DependencyGraphEdge> graphAdapter = new MutableValueGraphAdapter<DependencyGraphNode, DependencyGraphEdge>(graph, new DependencyGraphEdge(UNKNOWN_DEP), edge -> 0.0);
-		TarjanSimpleCycles<DependencyGraphNode, EndpointPair<DependencyGraphNode>> tarjanSimpleCycles = new TarjanSimpleCycles<>(graphAdapter);
-		List<List<DependencyGraphNode>> findSimpleCycles = tarjanSimpleCycles.findSimpleCycles();
+	private void removeCycles(DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
+		SzwarcfiterLauerSimpleCycles<DependencyGraphNode, DependencyGraphEdge> cycleFinder = new SzwarcfiterLauerSimpleCycles<>(graph);
+		List<List<DependencyGraphNode>> findSimpleCycles = cycleFinder.findSimpleCycles();
 		for (List<DependencyGraphNode> cycle: findSimpleCycles) {
 			System.out.println("Cycle:");
 			System.out.println(cycle.stream().map(node -> node.toString()).collect(Collectors.joining(" - ")));
@@ -180,7 +173,7 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 	private Set<String> projectGavs = new HashSet<>();
 
 	public void buildDependencyGraph(MavenProject project,
-			MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) throws MojoExecutionException {
+			DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) throws MojoExecutionException {
 
 		getLog().info("Working on project: " + getGav(project));
 		if (projectGavs.contains(getGav(project))) {
@@ -191,12 +184,12 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 
 		// Add root node
 		DependencyGraphNode rootNode = new DependencyGraphNode(project, "jar");
-		Optional<DependencyGraphNode> existingNode = graph.nodes().stream()
+		Optional<DependencyGraphNode> existingNode = graph.vertexSet().stream()
 				.filter(it -> it.equals(new DependencyGraphNode(project, "jar"))).findFirst();
 		if (existingNode.isPresent()) {
 			rootNode = existingNode.get();
 		} else {
-			graph.addNode(rootNode);
+			graph.addVertex(rootNode);
 		}
 
 		rootNode.setAsProject(true);
@@ -226,7 +219,7 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 	}
 
 	private void addBuildPluginDependenciesFor(MavenProject project,
-			MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph, DependencyGraphNode parentNode) {
+			DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph, DependencyGraphNode parentNode) {
 		List<Plugin> buildPlugins = project.getBuildPlugins();
 
 		MavenExecutionPlan executionPlan = null;
@@ -243,8 +236,8 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 		for (Plugin plugin : buildPlugins) {
 			if (isRelevant(plugin, executionPlan)) {
 				DependencyGraphNode pluginNode = new DependencyGraphNode(plugin);
-				graph.addNode(pluginNode);
-				graph.putEdgeValue(parentNode, pluginNode, new DependencyGraphEdge(DependencyType.PLUGIN_DEP));
+				graph.addVertex(pluginNode);
+				graph.addEdge(parentNode, pluginNode, new DependencyGraphEdge(DependencyType.PLUGIN_DEP));
 			}
 		}
 	}
@@ -260,20 +253,20 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 				.map(execution -> execution.getLifecyclePhase()).collect(toList());
 	}
 
-	private void addParentsFor(MavenProject project, MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph,
+	private void addParentsFor(MavenProject project, DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph,
 			DependencyGraphNode node) {
 		MavenProject parentProject = project.getParent();
 		if (parentProject != null) {
 			DependencyGraphNode parentNode = new DependencyGraphNode(parentProject, "pom");
-			graph.addNode(parentNode);
-			graph.putEdgeValue(node, parentNode, new DependencyGraphEdge(DependencyType.PARENT));
+			graph.addVertex(parentNode);
+			graph.addEdge(node, parentNode, new DependencyGraphEdge(DependencyType.PARENT));
 
 			addParentsFor(parentProject, graph, node);
 		}
 	}
 
 	private void addDependenciesFor(MavenProject project,
-			MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) throws MojoExecutionException {
+			DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) throws MojoExecutionException {
 		DefaultDependencyResolutionRequest request = new DefaultDependencyResolutionRequest();
 		request.setResolutionFilter(
 				(node, parents) -> node.getDependency() == null || !node.getDependency().isOptional());
@@ -304,7 +297,7 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 		return repositorySession;
 	}
 
-	private void writeGraph(MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph)
+	private void writeGraph(DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph)
 			throws MojoExecutionException {
 		Configuration freemarkerConfig = createFreemarkerConfig();
 
@@ -324,16 +317,16 @@ public class GenerateCompleteGraphMojo extends AbstractMojo {
 		}
 	}
 
-	private Map<String, Object> createGraphModel(MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
+	private Map<String, Object> createGraphModel(DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
 		Map<String, Object> model = new HashMap<>();
-		model.put("nodes", graph.nodes());
-		model.put("edges", graph.edges().stream().map(it -> createEdgeTemplateModel(it, graph)).collect(toSet()));
+		model.put("nodes", graph.vertexSet());
+		model.put("edges", graph.edgeSet().stream().map(it -> createEdgeTemplateModel(it, graph)).collect(toSet()));
 		return model;
 	}
 
-	private EdgeTemplateModel createEdgeTemplateModel(EndpointPair<DependencyGraphNode> endpointPair,
-			MutableValueGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
-		return new EdgeTemplateModel(endpointPair.nodeU(), endpointPair.nodeV(), graph.edgeValue(endpointPair));
+	private EdgeTemplateModel createEdgeTemplateModel(DependencyGraphEdge edge,
+			DefaultDirectedGraph<DependencyGraphNode, DependencyGraphEdge> graph) {
+		return new EdgeTemplateModel(graph.getEdgeSource(edge), graph.getEdgeTarget(edge), edge);
 	}
 
 	private Configuration createFreemarkerConfig() {

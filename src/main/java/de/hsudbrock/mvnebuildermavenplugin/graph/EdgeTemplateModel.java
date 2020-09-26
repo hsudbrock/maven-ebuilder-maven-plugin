@@ -1,18 +1,16 @@
 package de.hsudbrock.mvnebuildermavenplugin.graph;
 
-import java.util.Optional;
-
 public class EdgeTemplateModel {
 
 	private final DependencyGraphNode nodeU;
 	private final DependencyGraphNode nodeV;
-	private final DependencyGraphEdge edgeValue;
+	private final DependencyGraphEdge edge;
 
 	public EdgeTemplateModel(DependencyGraphNode nodeU, DependencyGraphNode nodeV,
-			Optional<DependencyGraphEdge> edgeValue) {
+			DependencyGraphEdge edge) {
 		this.nodeU = nodeU;
 		this.nodeV = nodeV;
-		this.edgeValue = edgeValue.get();
+		this.edge = edge;
 	}
 
 	public DependencyGraphNode getNodeU() {
@@ -24,7 +22,7 @@ public class EdgeTemplateModel {
 	}
 
 	public DependencyGraphEdge getEdgeValue() {
-		return edgeValue;
+		return edge;
 	}
 	
 }

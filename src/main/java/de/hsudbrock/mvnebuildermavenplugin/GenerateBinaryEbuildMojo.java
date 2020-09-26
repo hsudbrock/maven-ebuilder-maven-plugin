@@ -108,7 +108,7 @@ public class GenerateBinaryEbuildMojo extends AbstractMojo {
 		model.put("artifactId", project.getArtifactId());
 		model.put("version", project.getVersion());
 		
-		model.put("description", limitStringTo(70, project.getDescription().replace('\n', ' ')));
+		model.put("description", limitStringTo(65, project.getDescription().replace('\n', ' ')));
 		model.put("homepage", project.getUrl());
 		
 		List<String> licenses = getLicenses(project);
