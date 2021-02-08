@@ -1,15 +1,15 @@
-# Copyright 1999-2020 Gentoo Authors
+# Copyright 1999-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-# This ebuild was generated using the java-ebuilder-maven-plugin.
+# This ebuild was generated using the mvn-ebuilder-maven-plugin.
 
 EAPI=7
 
 inherit maven-pom
 
-DESCRIPTION="POM for: ${description}"
-HOMEPAGE="${homepage}"
-SRC_URI="${src_uri}"
+DESCRIPTION="TODO: POM for: ${description}"
+HOMEPAGE="TODO: ${homepage}"
+SRC_URI="${pom_src_uri}"
 
 LICENSE="${license}"
 
@@ -25,7 +25,3 @@ BDEPEND="~${parentPomAtom}"
 
 </#if>
 S="${r"${WORKDIR}"}"
-
-src_unpack() {
-	cp "${r"${DISTDIR}"}"/${pomFileName} "${r"${S}"}"/pom.xml || die "Could not copy downloaded pom file from ${r"${DISTDIR}"} to ${r"${S}"}"
-}
