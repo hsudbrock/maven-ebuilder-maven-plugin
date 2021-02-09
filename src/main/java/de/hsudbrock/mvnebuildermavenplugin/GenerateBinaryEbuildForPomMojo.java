@@ -155,7 +155,9 @@ public class GenerateBinaryEbuildForPomMojo extends AbstractMojo {
 
 		model.put("pom_src_uri", mavenRepoBase + getPomPath(project));
 		
-		model.put("parentPomAtom", pomCategory + "/" + project.getParent().getArtifactId() + "-pom:" + project.getParent().getVersion());
+		if (project.getParent() != null) {
+			model.put("parentPomAtom", pomCategory + "/" + project.getParent().getArtifactId() + "-pom-" + project.getParent().getVersion());
+		}
 
 		return model;
 	}

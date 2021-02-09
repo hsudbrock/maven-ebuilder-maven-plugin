@@ -14,6 +14,7 @@ public class LicenseMap {
 	
 	public LicenseMap() {
 		licenseMap.put("Apache License, Version 2.0", "Apache-2.0");
+		licenseMap.put("The Apache Software License, Version 2.0", "Apache-2.0");
 	}
 
 	public String getGentooLicenseString(String pomLicenseString) {
