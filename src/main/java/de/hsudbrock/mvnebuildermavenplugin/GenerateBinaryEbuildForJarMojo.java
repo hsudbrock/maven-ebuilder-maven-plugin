@@ -36,8 +36,8 @@ import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import freemarker.template.TemplateExceptionHandler;
 
-@Mojo(name = "generate-binary-ebuild-for-artifact", defaultPhase = LifecyclePhase.NONE, requiresProject = false, requiresDirectInvocation = true)
-public class GenerateBinaryEbuildForArtifactMojo extends AbstractMojo {
+@Mojo(name = "generate-binary-ebuild-for-jar", defaultPhase = LifecyclePhase.NONE, requiresProject = false, requiresDirectInvocation = true)
+public class GenerateBinaryEbuildForJarMojo extends AbstractMojo {
 
 	@Parameter(defaultValue = "${session}", readonly = true, required = true)
 	private MavenSession session;
